@@ -6,46 +6,44 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material3.Text
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
-import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview // Added Preview import
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import java.util.UUID
-import kotlin.random.Random
+import kotlinx.coroutines.delay
 
-enum class ShapeType {
-    CIRCLE,
-    SQUARE,
-    STAR
-}
-
-data class Shape(
-    val id: UUID = UUID.randomUUID(),
-    val type: ShapeType,
-    var x: Float,
-    var y: Float,
-    var size: Float,
-    val color: Color,
-    var speed: Float
+val pressStart2pFamily = FontFamily(
+    Font(R.font.press_start_2p_regular, FontWeight.Normal)
 )
 
-data class Basket(
-    var x: Float, // Center X of the basket
+data class Ball(
+    val x: Float,
+    val y: Float,
+    val speedX: Float,
+    val speedY: Float,
+    val radius: Float,
+    val color: Color
+)
+
+data class Paddle(
+    val x: Float, // Center X of the paddle
+    val y: Float, // Center Y of the paddle
     val width: Float,
     val height: Float,
     val color: Color
@@ -53,20 +51,15 @@ data class Basket(
 
 enum class GameStatus {
     Playing,
-    Paused,
-    GameOver,
-    Initializing
+    GameOver
 }
 
 data class GameState(
-    var shapes: List<Shape> = emptyList(),
-    var basket: Basket,
-    var score: Int = 0,
-    var status: GameStatus = GameStatus.Initializing,
-    var targetShapeType: ShapeType? = null,
-    var instructionMessage: String = "",
-    var canvasWidth: Float = 0f, 
-    var canvasHeight: Float = 0f 
+    val ball: Ball,
+    val paddleTop: Paddle,
+    val paddleBottom: Paddle,
+    val score: Int = 0,
+    val status: GameStatus = GameStatus.Playing
 )
 
 @Composable
@@ -79,196 +72,172 @@ fun GameScreen() {
     var gameState by remember {
         mutableStateOf(
             GameState(
-                basket = Basket(
-                    x = 0f, // Initial X, will be updated to center
-                    width = 200f,
-                    height = 50f,
-                    color = Color.Blue
-                ),
-                instructionMessage = "Catch Circles!",
-                targetShapeType = ShapeType.CIRCLE // Initial target
+                ball = Ball(x = 0f, y = 0f, speedX = 8f, speedY = 8f, radius = 30f, color = Color.White),
+                paddleTop = Paddle(x = 0f, y = 0f, width = 250f, height = 40f, color = Color.White),
+                paddleBottom = Paddle(x = 0f, y = 0f, width = 250f, height = 40f, color = Color.White)
             )
         )
     }
 
-    val textPaint = remember {
-        Paint().asFrameworkPaint().apply {
-            isAntiAlias = true
-            textSize = 60f
-            color = android.graphics.Color.WHITE // Changed to WHITE
-            textAlign = android.graphics.Paint.Align.CENTER
-        }
-    }
-    val scorePaint = remember {
-        Paint().asFrameworkPaint().apply {
-            isAntiAlias = true
-            textSize = 60f
-            color = android.graphics.Color.WHITE // Changed to WHITE
-            textAlign = android.graphics.Paint.Align.LEFT
-        }
-    }
-
-
-    LaunchedEffect(gameState.status, gameState.canvasWidth, gameState.canvasHeight, sensorManager, accelerometer) { // Relaunch if status or canvas dimensions change
+    DisposableEffect(sensorManager) {
         val sensorListener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
                 if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
-                    sensorX = -event.values[0] * 2.5f // Inverted and slightly amplified
+                    sensorX = -event.values[0] * 2.5f
                 }
             }
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
-        if (sensorManager != null && accelerometer != null) {
-            sensorManager.registerListener(sensorListener, accelerometer, SensorManager.SENSOR_DELAY_GAME)
-        }
 
-        var lastFrameTime = System.nanoTime()
-        while (gameState.status == GameStatus.Playing) { // Only run game loop when Playing
-            val currentTime = System.nanoTime()
-            val deltaTime = (currentTime - lastFrameTime) / 1_000_000_000.0f
-            lastFrameTime = currentTime
+        sensorManager?.registerListener(sensorListener, accelerometer, SensorManager.SENSOR_DELAY_GAME)
 
-            // Update shapes
-            val updatedShapesList = gameState.shapes.toMutableList() // Start with current shapes
-            val iterator = updatedShapesList.iterator()
-            while(iterator.hasNext()){
-                val shape = iterator.next()
-                shape.y += shape.speed * deltaTime * 20 // Update y position directly in this list
-            }
-            
-            // Shape generation
-            if (gameState.canvasWidth > 0f && Random.nextFloat() < 0.02f) { // Only generate if canvasWidth is known and based on probability
-                 val newGeneratedShape = Shape(
-                    type = ShapeType.values().random(),
-                    x = Random.nextFloat() * gameState.canvasWidth, // Use gameState.canvasWidth
-                    y = -50f, // Start above the screen
-                    size = Random.nextFloat() * 30f + 20f, // Random size
-                    color = Color(Random.nextInt(256), Random.nextInt(256), Random.nextInt(256)),
-                    speed = Random.nextFloat() * 100f + 50f // Random speed
-                )
-                updatedShapesList.add(newGeneratedShape) // Add the new shape to the already updated list
-            }
-            
-            // Update gameState with the list that contains moved shapes and potentially a new one
-            gameState = gameState.copy(shapes = updatedShapesList)
-
-
-            kotlinx.coroutines.delay(16) // Aim for ~60 FPS
-        }
-    }
-
-    DisposableEffect(sensorManager) {
-        // IMPORTANT: The 'sensorListener' instance below is a NEW anonymous object created for unregistration.
-        // For correct unregistration in a more complex scenario, you would typically unregister the
-        // *exact same instance* that was registered. This often involves hoisting the listener
-        // instance to a scope accessible by both LaunchedEffect and DisposableEffect (e.g., using remember).
-        // However, for the current structure and preview fix, this approach is functional.
-        val sensorListener = object : SensorEventListener { 
-            override fun onSensorChanged(event: SensorEvent?) {}
-            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
-        }
         onDispose {
             sensorManager?.unregisterListener(sensorListener)
         }
     }
 
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val currentBasket = gameState.basket
-        val currentCanvasWidth = size.width
-        val currentCanvasHeight = size.height
+    val configuration = LocalConfiguration.current
+    val density = LocalDensity.current
+    val screenWidth = with(density) { configuration.screenWidthDp.dp.toPx() }
+    val screenHeight = with(density) { configuration.screenHeightDp.dp.toPx() }
 
-        if (gameState.status == GameStatus.Initializing && currentCanvasWidth > 0 && currentCanvasHeight > 0) {
-            gameState = gameState.copy(
-                basket = currentBasket.copy(x = currentCanvasWidth / 2f),
-                status = GameStatus.Playing,
-                canvasWidth = currentCanvasWidth, 
-                canvasHeight = currentCanvasHeight
-            )
-        }
+    Box(modifier = Modifier.fillMaxSize()) {
+        LaunchedEffect(gameState.status, screenWidth, screenHeight) {
+            if (gameState.paddleBottom.y == 0f && screenHeight > 0) {
+                // *** CHANGE THESE VALUES TO MOVE PADDLES CLOSER TO THE EDGE ***
+                val topPaddleY = screenHeight * 0.10f
+                val bottomPaddleY = screenHeight * 0.90f
 
-        if (gameState.status == GameStatus.Playing) {
-            val newBasketX = currentBasket.x + sensorX
-            currentBasket.x = newBasketX.coerceIn(currentBasket.width / 2f, currentCanvasWidth - currentBasket.width / 2f)
-
-            val topLeftX = currentBasket.x - currentBasket.width / 2f
-            val topLeftY = currentCanvasHeight - currentBasket.height - 50f 
-            drawRect(
-                color = currentBasket.color,
-                topLeft = Offset(topLeftX, topLeftY),
-                size = Size(currentBasket.width, currentBasket.height)
-            )
-
-            gameState.shapes.forEach { shape ->
-                drawCircle(
-                    color = shape.color,
-                    radius = shape.size,
-                    center = Offset(shape.x, shape.y)
+                gameState = gameState.copy(
+                    ball = gameState.ball.copy(
+                        x = screenWidth / 2f,
+                        y = screenHeight / 2f
+                    ),
+                    paddleTop = gameState.paddleTop.copy(
+                        x = screenWidth / 2f,
+                        y = topPaddleY
+                    ),
+                    paddleBottom = gameState.paddleBottom.copy(
+                        x = screenWidth / 2f,
+                        y = bottomPaddleY
+                    )
                 )
             }
 
-            val basketRect = androidx.compose.ui.geometry.Rect(
-                left = topLeftX,
-                top = topLeftY,
-                right = topLeftX + currentBasket.width,
-                bottom = topLeftY + currentBasket.height
-            )
-            val caughtShapes = gameState.shapes.filter { shape ->
-                val shapeRect = androidx.compose.ui.geometry.Rect(
-                    left = shape.x - shape.size,
-                    top = shape.y - shape.size,
-                    right = shape.x + shape.size,
-                    bottom = shape.y + shape.size
+            while (gameState.status == GameStatus.Playing && screenWidth > 0) {
+                val newPaddleX = (gameState.paddleBottom.x + sensorX).coerceIn(
+                    gameState.paddleBottom.width / 2f,
+                    screenWidth - gameState.paddleBottom.width / 2f
                 )
-                basketRect.overlaps(shapeRect)
-            }
 
-            var newScore = gameState.score
-            var newShapesList = gameState.shapes
-            var newTargetShape = gameState.targetShapeType
-            var newInstruction = gameState.instructionMessage
+                val newBall = gameState.ball.copy(
+                    x = gameState.ball.x + gameState.ball.speedX,
+                    y = gameState.ball.y + gameState.ball.speedY
+                )
 
-            if (caughtShapes.isNotEmpty()) {
-                newScore += caughtShapes.count { it.type == gameState.targetShapeType }
-                newShapesList = gameState.shapes.filterNot { caughtShapes.contains(it) }
-                
-                if (caughtShapes.any{it.type == gameState.targetShapeType}) {
-                    newTargetShape = ShapeType.values().filterNot { it == gameState.targetShapeType }.random()
-                    newInstruction = "Catch ${newTargetShape.name.lowercase().replaceFirstChar { it.uppercase() }}s!"
+                var newSpeedX = gameState.ball.speedX
+                var newSpeedY = gameState.ball.speedY
+                var newScore = gameState.score
+                var newStatus = gameState.status
+
+                if (newBall.x < newBall.radius || newBall.x > screenWidth - newBall.radius) {
+                    newSpeedX *= -1
                 }
-            }
-            
-            val shapesOnScreen = newShapesList.filter { shape ->
-                shape.y < currentCanvasHeight + shape.size 
-            }
 
-            if (newScore != gameState.score || newShapesList.size != shapesOnScreen.size || newShapesList.size != gameState.shapes.size || newTargetShape != gameState.targetShapeType) {
-                 gameState = gameState.copy(
-                    shapes = shapesOnScreen,
-                    score = newScore,
-                    targetShapeType = newTargetShape,
-                    instructionMessage = newInstruction
+                val paddleTopRect = androidx.compose.ui.geometry.Rect(
+                    left = newPaddleX - gameState.paddleTop.width / 2,
+                    top = gameState.paddleTop.y - gameState.paddleTop.height / 2,
+                    right = newPaddleX + gameState.paddleTop.width / 2,
+                    bottom = gameState.paddleTop.y + gameState.paddleTop.height / 2
                 )
+                val paddleBottomRect = androidx.compose.ui.geometry.Rect(
+                    left = newPaddleX - gameState.paddleBottom.width / 2,
+                    top = gameState.paddleBottom.y - gameState.paddleBottom.height / 2,
+                    right = newPaddleX + gameState.paddleBottom.width / 2,
+                    bottom = gameState.paddleBottom.y + gameState.paddleBottom.height / 2
+                )
+
+                val topPaddleCollision = (newBall.y - newBall.radius < paddleTopRect.bottom && newBall.y + newBall.radius > paddleTopRect.top && newSpeedY < 0 && newBall.x > paddleTopRect.left && newBall.x < paddleTopRect.right)
+                val bottomPaddleCollision = (newBall.y + newBall.radius > paddleBottomRect.top && newBall.y - newBall.radius < paddleBottomRect.bottom && newSpeedY > 0 && newBall.x > paddleBottomRect.left && newBall.x < paddleBottomRect.right)
+
+                if (topPaddleCollision || bottomPaddleCollision) {
+                    newSpeedY *= -1.1f
+                    newSpeedX *= 1.1f
+                    newScore++
+                } else {
+                    val topPaddleY = gameState.paddleTop.y
+                    val bottomPaddleY = gameState.paddleBottom.y
+
+                    if ((newBall.y < topPaddleY && newSpeedY < 0) || (newBall.y > bottomPaddleY && newSpeedY > 0)) {
+                        newStatus = GameStatus.GameOver
+                    }
+                }
+
+                gameState = gameState.copy(
+                    ball = newBall.copy(speedX = newSpeedX, speedY = newSpeedY),
+                    paddleTop = gameState.paddleTop.copy(x = newPaddleX),
+                    paddleBottom = gameState.paddleBottom.copy(x = newPaddleX),
+                    score = newScore,
+                    status = newStatus
+                )
+
+                delay(16)
             }
         }
 
-        drawIntoCanvas { canvas ->
-            canvas.nativeCanvas.drawText(
-                "Score: ${gameState.score}",
-                60f, 
-                160f, // Adjusted Y position
-                scorePaint
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRect(color = Color.Black, size = size)
+
+            drawRect(
+                color = gameState.paddleTop.color,
+                topLeft = Offset(gameState.paddleTop.x - gameState.paddleTop.width / 2, gameState.paddleTop.y - gameState.paddleTop.height / 2),
+                size = Size(gameState.paddleTop.width, gameState.paddleTop.height)
             )
-            canvas.nativeCanvas.drawText(
-                gameState.instructionMessage,
-                currentCanvasWidth / 2f, 
-                160f, // Adjusted Y position
-                textPaint
+
+            drawRect(
+                color = gameState.paddleBottom.color,
+                topLeft = Offset(gameState.paddleBottom.x - gameState.paddleBottom.width / 2, gameState.paddleBottom.y - gameState.paddleBottom.height / 2),
+                size = Size(gameState.paddleBottom.width, gameState.paddleBottom.height)
+            )
+
+            drawCircle(
+                color = gameState.ball.color,
+                radius = gameState.ball.radius,
+                center = Offset(gameState.ball.x, gameState.ball.y)
+            )
+        }
+
+        Text(
+            text = "Score: ${gameState.score}",
+            style = TextStyle(
+                fontFamily = pressStart2pFamily,
+                fontSize = 24.sp,
+                color = Color.White,
+                textAlign = TextAlign.Center
+            ),
+            modifier = Modifier
+                .fillMaxSize()
+                .align(Alignment.TopCenter)
+        )
+
+        if (gameState.status == GameStatus.GameOver) {
+            Text(
+                text = "Game Over",
+                style = TextStyle(
+                    fontFamily = pressStart2pFamily,
+                    fontSize = 36.sp,
+                    color = Color.White,
+                    textAlign = TextAlign.Center
+                ),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .align(Alignment.Center)
             )
         }
     }
 }
 
-@Preview(showBackground = true)
+@Preview(showBackground = true, showSystemUi = true)
 @Composable
 fun GameScreenPreview() {
     GameScreen()
