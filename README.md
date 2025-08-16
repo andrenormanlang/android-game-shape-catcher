@@ -1,4 +1,4 @@
-#  अकेले घंटा 🏓
+#  PONG ALONE 🏓
 
 A simple, accelerometer-controlled paddle game built with Jetpack Compose. This was created as a project for an Android development course.
 
