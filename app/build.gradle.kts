@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.andrenormanlang.shapecatcher"
+    namespace = "com.andrenormanlang.pongalone"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.andrenormanlang.shapecatcher"
+        applicationId = "com.andrenormanlang.pongalone"
         minSdk = 28
         targetSdk = 36
         versionCode = 1

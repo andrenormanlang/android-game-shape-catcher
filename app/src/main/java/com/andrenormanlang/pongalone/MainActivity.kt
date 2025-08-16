@@ -1,5 +1,4 @@
-package com.andrenormanlang.shapecatcher
-
+package com.andrenormanlang.pongalone
 import android.os.Bundle
 import android.view.View
 import androidx.activity.ComponentActivity
@@ -20,7 +19,8 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import com.andrenormanlang.shapecatcher.ui.theme.ShapeCatcherTheme
+import com.andrenormanlang.pongalone.GameScreen
+import com.andrenormanlang.pongalone.ui.theme.PongAloneTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,7 +28,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         hideSystemBars()
         setContent {
-            ShapeCatcherTheme {
+            PongAloneTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     val navController = rememberNavController()
                     NavHost(navController = navController, startDestination = "mainMenu") {
@@ -64,7 +64,7 @@ fun MainMenuScreen(modifier: Modifier = Modifier, onStartGame: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Shape Catcher",
+            text = "Pong Alone",
             fontSize = 32.sp,
             style = MaterialTheme.typography.headlineLarge
         )
@@ -82,7 +82,7 @@ fun MainMenuScreen(modifier: Modifier = Modifier, onStartGame: () -> Unit) {
 @Preview(showBackground = true)
 @Composable
 fun MainMenuScreenPreview() {
-    ShapeCatcherTheme {
+    PongAloneTheme {
         MainMenuScreen(onStartGame = {})
     }
 }

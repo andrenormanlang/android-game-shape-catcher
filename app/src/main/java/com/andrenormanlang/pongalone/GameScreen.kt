@@ -1,4 +1,4 @@
-package com.andrenormanlang.shapecatcher
+package com.andrenormanlang.pongalone
 
 import android.content.Context
 import android.hardware.Sensor
@@ -8,6 +8,8 @@ import android.hardware.SensorManager
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -29,7 +31,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 
 val pressStart2pFamily = FontFamily(
-    Font(R.font.press_start_2p_regular, FontWeight.Normal)
+    Font(R.font.press_start_2p, FontWeight.Normal)
 )
 
 data class Ball(
@@ -83,7 +85,7 @@ fun GameScreen() {
         val sensorListener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent?) {
                 if (event?.sensor?.type == Sensor.TYPE_ACCELEROMETER) {
-                    sensorX = -event.values[0] * 2.5f
+                    sensorX = -event.values[0] * 5.0f
                 }
             }
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -216,23 +218,28 @@ fun GameScreen() {
                 textAlign = TextAlign.Center
             ),
             modifier = Modifier
-                .fillMaxSize()
+                .statusBarsPadding()
+                .padding(top = 22.dp)
                 .align(Alignment.TopCenter)
         )
 
         if (gameState.status == GameStatus.GameOver) {
-            Text(
-                text = "Game Over",
-                style = TextStyle(
-                    fontFamily = pressStart2pFamily,
-                    fontSize = 36.sp,
-                    color = Color.White,
-                    textAlign = TextAlign.Center
-                ),
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .align(Alignment.Center)
-            )
+                    .padding(16.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Game Over",
+                    style = TextStyle(
+                        fontFamily = pressStart2pFamily,
+                        fontSize = 36.sp,
+                        color = Color.Red,
+                        textAlign = TextAlign.Center
+                    )
+                )
+            }
         }
     }
 }

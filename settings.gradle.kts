@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Shape Catcher"
+rootProject.name = "Pong Alone"
 include(":app")

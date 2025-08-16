@@ -1,4 +1,4 @@
-package com.andrenormanlang.shapecatcher
+package com.andrenormanlang.pongalone
 
 import org.junit.Test
 

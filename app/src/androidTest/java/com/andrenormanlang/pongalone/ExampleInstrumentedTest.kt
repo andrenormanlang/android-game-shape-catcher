@@ -1,4 +1,4 @@
-package com.andrenormanlang.shapecatcher
+package com.andrenormanlang.pongalone
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

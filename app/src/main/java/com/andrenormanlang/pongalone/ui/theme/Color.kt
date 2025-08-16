@@ -1,4 +1,4 @@
-package com.andrenormanlang.shapecatcher.ui.theme
+package com.andrenormanlang.pongalone.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
